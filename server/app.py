@@ -27,7 +27,31 @@ def index_articles():
 
 @app.route('/articles/<int:id>')
 def show_article(id):
-    pass
+    # Step 1: Initialize the counter on the user's first request.
+    # session.get() returns None (instead of raising a KeyError) when
+    # 'page_views' doesn't exist yet, so "or 0" sets the starting value to 0.
+    # If the key already exists, its current count is kept.
+    session['page_views'] = session.get('page_views') or 0
+
+    # Step 2: Count this request as one page view.
+    # The count is stored in Flask's signed session cookie, so users can't
+    # reset or change it from the browser's dev tools.
+    session['page_views'] += 1
+
+    # Step 3a: Paywall. After 3 views, block the article and return a 401.
+    # The React client looks for this exact message to show its paywall screen.
+    if session['page_views'] > 3:
+        return {'message': 'Maximum pageview limit reached'}, 401
+
+    # Step 3b: Under the limit, look up the requested article by its id.
+    article = Article.query.filter_by(id=id).first()
+
+    # If no article has that id, return a 404 instead of crashing.
+    if article is None:
+        return {'message': f'Article {id} not found'}, 404
+
+    # Return the article as JSON (title, author, content, etc.) with a 200.
+    return ArticleSchema().dump(article), 200
 
 
 if __name__ == '__main__':
